@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+<title>CodeLab</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0e0e16;--panel:#13131f;--surface:#1a1a2e;--s2:#1f1f38;
+  --border:#252542;--b2:#2e2e52;
+  --accent:#5865f2;--adim:#5865f222;
+  --green:#23d18b;--red:#f14c4c;--yellow:#e5c07b;
+  --blue:#61afef;--purple:#c678dd;--cyan:#4fc1ff;
+  --text:#abb2bf;--bright:#e6e6ef;--muted:#4a4a6a;
+  --topbar:48px;--status:24px;--tabs:36px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:"JetBrains Mono",monospace}
+
+/* ─── TOPBAR ─────────────────────────────────── */
+#topbar{
+  height:var(--topbar);background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 10px;gap:7px;flex-shrink:0;z-index:100;
+}
+.logo{font-family:"Syne",sans-serif;font-weight:800;font-size:17px;
+  background:linear-gradient(135deg,#5865f2,#eb459e);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0}
+.sp{flex:1}
+#lang-pill{display:flex;align-items:center;gap:5px;background:var(--surface);
+  border:1px solid var(--b2);border-radius:7px;padding:5px 10px;cursor:pointer;
+  font-size:12px;color:var(--bright);flex-shrink:0;font-family:"JetBrains Mono",monospace;}
+#lang-pill:active{background:var(--s2)}
+.arrow{color:var(--muted);font-size:10px}
+#btn-run{display:flex;align-items:center;gap:6px;background:var(--green);color:#071a0f;
+  border:none;border-radius:8px;padding:7px 14px;
+  font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:700;
+  cursor:pointer;flex-shrink:0;transition:filter .15s;}
+#btn-run:active{filter:brightness(.82);transform:scale(.97)}
+#btn-run.running{background:var(--red);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.ibtn{width:34px;height:34px;border-radius:7px;background:var(--surface);
+  border:1px solid var(--b2);color:var(--text);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;font-size:15px;flex-shrink:0;
+  -webkit-appearance:none;transition:all .1s;}
+.ibtn:active{background:var(--s2);transform:scale(.93)}
+
+/* ─── LAYOUT ─────────────────────────────────── */
+#app{display:flex;height:calc(100dvh - var(--topbar) - var(--status));overflow:hidden;position:relative;}
+
+/* ─── SIDEBAR ────────────────────────────────── */
+#sb-overlay{display:none;position:absolute;inset:0;background:#00000066;z-index:80;backdrop-filter:blur(2px);}
+#sb-overlay.on{display:block}
+#sidebar{width:250px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;z-index:90;}
+@media(max-width:700px){
+  #sidebar{position:absolute;top:0;bottom:0;left:0;transform:translateX(-100%);
+    transition:transform .25s cubic-bezier(.4,0,.2,1);box-shadow:6px 0 24px #000a;}
+  #sidebar.on{transform:translateX(0)}
+}
+.sb-head{padding:10px 12px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-title{font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:7px}
+.search-box{width:100%;background:var(--surface);border:1px solid var(--b2);border-radius:7px;
+  padding:6px 10px;color:var(--bright);font-family:"JetBrains Mono",monospace;font-size:12px;outline:none;}
+.search-box:focus{border-color:var(--accent)}
+.search-box::placeholder{color:var(--muted)}
+#file-tree{flex:1;overflow-y:auto;padding:4px 0;user-select:none}
+
+/* Tree nodes */
+.tree-folder{cursor:pointer;user-select:none}
+.folder-row{display:flex;align-items:center;gap:6px;padding:6px 10px;
+  color:var(--text);font-size:12px;border-left:2px solid transparent;transition:all .1s;}
+.folder-row:hover,.folder-row:active{background:var(--surface)}
+.folder-row .fi{font-size:13px;flex-shrink:0;transition:transform .15s}
+.folder-row.open .fi{transform:rotate(90deg)}
+.folder-children{padding-left:12px;overflow:hidden}
+.folder-children.hidden{display:none}
+
+.tree-file{display:flex;align-items:center;gap:6px;width:100%;padding:6px 10px;
+  background:none;border:none;color:var(--text);
+  font-family:"JetBrains Mono",monospace;font-size:12px;cursor:pointer;text-align:left;
+  border-left:2px solid transparent;transition:all .1s;}
+.tree-file:active{background:var(--s2)}
+.tree-file.active{background:var(--adim);color:var(--accent);border-left-color:var(--accent)}
+.tree-file.modified .fname::after{content:" ●";color:var(--yellow);font-size:9px}
+.ficon{font-size:13px;width:16px;text-align:center;flex-shrink:0}
+
+/* Tree context actions */
+.tree-actions{display:flex;gap:4px;padding:6px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.tact{flex:1;background:var(--surface);border:1px solid var(--b2);color:var(--text);
+  border-radius:6px;padding:6px 2px;font-family:"JetBrains Mono",monospace;font-size:10px;
+  cursor:pointer;transition:all .1s;}
+.tact:active{background:var(--s2)}
+
+/* ─── EDITOR PANEL ───────────────────────────── */
+#editor-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#tabs{height:var(--tabs);background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-end;overflow-x:auto;flex-shrink:0;}
+#tabs::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:5px;padding:0 11px;height:100%;
+  background:transparent;border:none;color:var(--muted);
+  font-family:"JetBrains Mono",monospace;font-size:12px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;border-right:1px solid var(--border);
+  border-top:2px solid transparent;transition:color .1s;}
+.tab.active{color:var(--bright);background:var(--bg);border-top-color:var(--accent)}
+.tab-close{width:16px;height:16px;border-radius:3px;background:none;border:none;
+  color:var(--muted);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0;}
+.tab-close:active{color:var(--red)}
+.tab-add{padding:0 12px;height:100%;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;flex-shrink:0;}
+
+/* Monaco + Textarea fallback */
+#editor-wrap{flex:1;position:relative;overflow:hidden}
+#monaco-container{width:100%;height:100%}
+
+/* ── TEXTAREA FALLBACK (mobile / no monaco) ── */
+#txt-editor{
+  width:100%;height:100%;background:var(--bg);color:var(--bright);
+  border:none;outline:none;resize:none;
+  font-family:"JetBrains Mono",monospace;font-size:13px;line-height:1.65;
+  padding:12px;tab-size:2;-webkit-overflow-scrolling:touch;
+  caret-color:var(--accent);display:none;
+}
+#txt-editor::selection{background:var(--adim)}
+
+.empty-state{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:var(--muted);
+  background:var(--bg);pointer-events:none;gap:10px}
+.empty-state .ei{font-size:40px;opacity:.3}
+.empty-state p{font-size:12px;opacity:.4}
+
+/* ─── RESIZE ─────────────────────────────────── */
+#rhandle{width:4px;background:var(--border);cursor:col-resize;flex-shrink:0;transition:background .15s;}
+#rhandle:hover,#rhandle.drag{background:var(--accent)}
+@media(max-width:700px){#rhandle{display:none}}
+
+/* ─── OUTPUT PANEL ───────────────────────────── */
+#out-panel{width:320px;flex-shrink:0;display:flex;flex-direction:column;
+  border-left:1px solid var(--border);background:var(--panel);overflow:hidden;}
+#out-panel.dh{width:0!important;border-left:none}
+@media(max-width:700px){
+  #out-panel{position:absolute;bottom:0;left:0;right:0;width:100%!important;height:0;
+    border-left:none;border-top:1px solid var(--border);
+    transition:height .3s cubic-bezier(.4,0,.2,1);z-index:50;}
+  #out-panel.mo{height:44vh}
+  #out-panel.dh{width:100%!important;height:0}
+}
+.dhandle{display:none;height:18px;align-items:center;justify-content:center;
+  cursor:ns-resize;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.dhandle::after{content:'';width:32px;height:4px;background:var(--b2);border-radius:2px;}
+@media(max-width:700px){.dhandle{display:flex}}
+.op-head{display:flex;align-items:center;gap:4px;background:var(--surface);
+  border-bottom:1px solid var(--border);height:34px;padding:0 10px;flex-shrink:0;}
+.op-tab{padding:3px 10px;border-radius:5px;font-size:11px;background:none;border:none;
+  color:var(--muted);cursor:pointer;font-family:"JetBrains Mono",monospace;}
+.op-tab.active{background:var(--bg);color:var(--bright)}
+.op-clear{margin-left:auto;background:none;border:1px solid var(--b2);color:var(--muted);
+  border-radius:5px;padding:2px 8px;font-size:10px;cursor:pointer;
+  font-family:"JetBrains Mono",monospace;}
+.op-clear:active{border-color:var(--red);color:var(--red)}
+#out-scroll{flex:1;overflow-y:auto;padding:10px 12px;-webkit-overflow-scrolling:touch}
+.log-line{display:flex;gap:8px;padding:2px 0;animation:logIn .15s ease}
+@keyframes logIn{from{opacity:0;transform:translateY(3px)}to{opacity:1}}
+.lt{color:var(--muted);flex-shrink:0;font-size:10px;padding-top:2px}
+.lm{word-break:break-all;white-space:pre-wrap;font-size:12px;line-height:1.65}
+.log-stdout{color:var(--bright)}.log-stderr{color:var(--red)}.log-info{color:var(--cyan)}
+.log-success{color:var(--green)}.log-warn{color:var(--yellow)}.log-system{color:var(--purple)}
+#stdin-sec,#args-sec{display:none;flex-direction:column;padding:10px 12px;gap:6px;
+  border-top:1px solid var(--border);flex-shrink:0;}
+#stdin-sec.on,#args-sec.on{display:flex}
+.ilbl{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+#stdin-inp{width:100%;background:var(--surface);border:1px solid var(--b2);color:var(--bright);
+  border-radius:7px;padding:7px 10px;font-family:"JetBrains Mono",monospace;
+  font-size:12px;resize:none;outline:none;height:68px;}
+#args-inp{width:100%;background:var(--surface);border:1px solid var(--b2);color:var(--bright);
+  border-radius:7px;padding:7px 10px;font-family:"JetBrains Mono",monospace;font-size:12px;outline:none;}
+#stdin-inp:focus,#args-inp:focus{border-color:var(--accent)}
+#stdin-inp::placeholder,#args-inp::placeholder{color:var(--muted)}
+
+/* ─── STATUS BAR ─────────────────────────────── */
+#statusbar{height:var(--status);background:var(--accent);display:flex;align-items:center;
+  padding:0 12px;font-size:11px;color:rgba(255,255,255,.75);gap:10px;flex-shrink:0;}
+.bsep{opacity:.3}
+.bright{margin-left:auto;display:flex;gap:10px}
+
+/* ─── MODALS ─────────────────────────────────── */
+.mbg{display:none;position:fixed;inset:0;z-index:200;background:#000a;
+  backdrop-filter:blur(4px);align-items:flex-end;justify-content:center;}
+.mbg.on{display:flex}
+@media(min-width:701px){.mbg{align-items:center}}
+.msheet{background:var(--panel);border:1px solid var(--b2);border-radius:16px 16px 0 0;
+  width:100%;max-width:500px;padding:14px 0 28px;animation:sup .2s ease;
+  max-height:80vh;overflow:hidden;display:flex;flex-direction:column;}
+@media(min-width:701px){.msheet{border-radius:13px;width:360px;animation:pin .18s ease}}
+@keyframes sup{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pin{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.shdl{width:34px;height:4px;background:var(--b2);border-radius:2px;margin:0 auto 12px}
+@media(min-width:701px){.shdl{display:none}}
+.shtitle{font-family:"Syne",sans-serif;font-size:14px;font-weight:700;
+  color:var(--bright);padding:0 16px 10px;border-bottom:1px solid var(--border)}
+.lang-list{overflow-y:auto;flex:1;padding:6px 0}
+.lang-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;
+  background:none;border:none;width:100%;text-align:left;
+  font-family:"JetBrains Mono",monospace;font-size:13px;color:var(--text);}
+.lang-item:active{background:var(--surface)}
+.lang-item.sel{color:var(--accent);background:var(--adim)}
+.lang-item .lv{font-size:10px;color:var(--muted);margin-left:auto}
+.lang-item .ck{color:var(--accent)}
+
+/* Input modal (new file / new folder) */
+.inp-sheet{background:var(--panel);border:1px solid var(--b2);border-radius:16px 16px 0 0;
+  width:100%;max-width:500px;padding:20px 16px 32px;animation:sup .2s ease;}
+@media(min-width:701px){.inp-sheet{border-radius:13px;width:340px;animation:pin .18s ease}}
+.inp-title{font-family:"Syne",sans-serif;font-size:15px;font-weight:700;color:var(--bright);margin-bottom:13px}
+.inp-input{width:100%;background:var(--surface);border:1px solid var(--b2);color:var(--bright);
+  border-radius:9px;padding:10px 13px;font-family:"JetBrains Mono",monospace;
+  font-size:14px;outline:none;margin-bottom:13px;}
+.inp-input:focus{border-color:var(--accent)}
+.inp-btns{display:flex;gap:8px}
+.ibtn2{flex:1;padding:10px;border-radius:9px;font-family:"JetBrains Mono",monospace;
+  font-size:13px;cursor:pointer;border:none;font-weight:600;}
+.ibtn2.ok{background:var(--accent);color:#fff}
+.ibtn2.ok:active{filter:brightness(.9)}
+.ibtn2.cancel{background:var(--surface);color:var(--text);border:1px solid var(--b2)}
+
+/* Toast */
+.toast{position:fixed;top:58px;left:50%;transform:translateX(-50%) translateY(-6px);
+  background:var(--surface);border:1px solid var(--b2);border-top:2px solid var(--accent);
+  color:var(--bright);padding:8px 16px;border-radius:9px;font-size:12px;
+  z-index:999;opacity:0;pointer-events:none;transition:all .2s;white-space:nowrap;}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+/* Upload zone */
+#drop-zone{display:none;position:fixed;inset:0;z-index:300;background:#0e0e16cc;
+  border:3px dashed var(--accent);border-radius:12px;margin:12px;
+  align-items:center;justify-content:center;flex-direction:column;gap:12px;
+  font-size:18px;color:var(--accent);backdrop-filter:blur(8px);}
+#drop-zone.on{display:flex}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <span class="logo">CodeLab</span>
+  <button class="ibtn" onclick="toggleSidebar()">☰</button>
+  <button id="lang-pill" onclick="openModal('modal-lang')">
+    <span id="lang-label">⚡ JS</span><span class="arrow">▾</span>
+  </button>
+  <div class="sp"></div>
+  <button id="btn-run" onclick="runCode()">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l10 6-10 6V2z"/></svg>Run
+  </button>
+  <button class="ibtn" onclick="toggleOutput()">⊞</button>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="sb-overlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-head">
+      <div class="sb-title">Explorer</div>
+      <input class="search-box" type="text" placeholder="🔍 ค้นหาไฟล์..." oninput="filterTree(this.value)" id="tree-search">
+    </div>
+    <div id="file-tree"></div>
+    <div class="tree-actions">
+      <button class="tact" onclick="promptNewFile()">＋ File</button>
+      <button class="tact" onclick="promptNewFolder()">📁 Folder</button>
+      <button class="tact" onclick="document.getElementById('fi-files').click()">📂 Open</button>
+      <button class="tact" onclick="document.getElementById('fi-zip').click()">📦 ZIP</button>
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <div id="editor-panel">
+    <div id="tabs"><button class="tab-add" onclick="promptNewFile()">+</button></div>
+    <div id="editor-wrap">
+      <div class="empty-state" id="empty-state">
+        <div class="ei">💻</div><p>เปิดหรือสร้างไฟล์</p>
+      </div>
+      <!-- Monaco (desktop) -->
+      <div id="monaco-container"></div>
+      <!-- Textarea fallback (mobile) -->
+      <textarea id="txt-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" oninput="onTxtInput()"></textarea>
+    </div>
+  </div>
+
+  <div id="rhandle" onmousedown="startResize(event)"></div>
+
+  <!-- OUTPUT -->
+  <div id="out-panel">
+    <div class="dhandle" id="dhandle"></div>
+    <div class="op-head">
+      <button class="op-tab active" onclick="switchOpTab(this,'out')">Output</button>
+      <button class="op-tab" onclick="switchOpTab(this,'stdin')">Stdin</button>
+      <button class="op-tab" onclick="switchOpTab(this,'args')">Args</button>
+      <button class="op-clear" onclick="clearLog()">✕</button>
+    </div>
+    <div id="out-scroll"></div>
+    <div id="stdin-sec">
+      <div class="ilbl">Standard Input</div>
+      <textarea id="stdin-inp" placeholder="ใส่ input..."></textarea>
+    </div>
+    <div id="args-sec">
+      <div class="ilbl">Arguments</div>
+      <input id="args-inp" type="text" placeholder="arg1 arg2">
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <span id="sb-lang">⚡ JavaScript</span>
+  <span class="bsep">|</span>
+  <span id="sb-file">No file</span>
+  <div class="bright">
+    <span id="sb-cur">Ln 1</span>
+    <span class="bsep">|</span>
+    <span id="sb-status">Ready</span>
+  </div>
+</div>
+
+<!-- DROP ZONE -->
+<div id="drop-zone">
+  <div style="font-size:48px">📦</div>
+  <div>วาง ZIP หรือไฟล์ที่นี่</div>
+</div>
+
+<!-- LANG MODAL -->
+<div class="mbg" id="modal-lang" onclick="if(event.target===this)closeModal('modal-lang')">
+  <div class="msheet" onclick="event.stopPropagation()">
+    <div class="shdl"></div>
+    <div class="shtitle">เลือกภาษา</div>
+    <div class="lang-list" id="lang-list"></div>
+  </div>
+</div>
+
+<!-- NEW FILE MODAL -->
+<div class="mbg" id="modal-newfile" onclick="if(event.target===this)closeModal('modal-newfile')">
+  <div class="inp-sheet" onclick="event.stopPropagation()">
+    <div class="inp-title" id="modal-newfile-title">📄 ไฟล์ใหม่</div>
+    <input class="inp-input" id="inp-newfile" type="text" placeholder="เช่น main.py"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      onkeydown="if(event.key==='Enter')confirmNewFile();if(event.key==='Escape')closeModal('modal-newfile')">
+    <div class="inp-btns">
+      <button class="ibtn2 cancel" onclick="closeModal('modal-newfile')">ยกเลิก</button>
+      <button class="ibtn2 ok" onclick="confirmNewFile()">สร้าง</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW FOLDER MODAL -->
+<div class="mbg" id="modal-newfolder" onclick="if(event.target===this)closeModal('modal-newfolder')">
+  <div class="inp-sheet" onclick="event.stopPropagation()">
+    <div class="inp-title">📁 โฟลเดอร์ใหม่</div>
+    <input class="inp-input" id="inp-newfolder" type="text" placeholder="เช่น src"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      onkeydown="if(event.key==='Enter')confirmNewFolder();if(event.key==='Escape')closeModal('modal-newfolder')">
+    <div class="inp-btns">
+      <button class="ibtn2 cancel" onclick="closeModal('modal-newfolder')">ยกเลิก</button>
+      <button class="ibtn2 ok" onclick="confirmNewFolder()">สร้าง</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fi-files" multiple
+  accept=".js,.ts,.py,.cpp,.c,.java,.go,.rs,.php,.rb,.sh,.lua,.cs,.kt,.swift,.txt,.json,.md,.html,.css"
+  onchange="handleFileOpen(event)">
+<input type="file" id="fi-zip" accept=".zip" onchange="handleZipOpen(event)">
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+// LANG CONFIG
+// ═══════════════════════════════════════════════
+const LANGS={
+  javascript:{label:"⚡ JavaScript",short:"⚡ JS",piston:"javascript",ver:"18.15.0",monaco:"javascript",ext:".js",
+    starter:"// JavaScript\nconsole.log(\"Hello, World!\");\n\nconst greet = name => `Hello, ${name}!`;\nconsole.log(greet(\"CodeLab\"));\n"},
+  python:{label:"🐍 Python",short:"🐍 Py",piston:"python",ver:"3.10.0",monaco:"python",ext:".py",
+    starter:"# Python\nprint(\"Hello, World!\")\n\ndef greet(name):\n    return f\"Hello, {name}!\"\n\nprint(greet(\"CodeLab\"))\n"},
+  typescript:{label:"📘 TypeScript",short:"📘 TS",piston:"typescript",ver:"5.0.3",monaco:"typescript",ext:".ts",
+    starter:"const greet = (name: string): string => `Hello, ${name}!`;\nconsole.log(greet(\"World\"));\n"},
+  cpp:{label:"⚙️ C++",short:"⚙️ C++",piston:"c++",ver:"10.2.0",monaco:"cpp",ext:".cpp",
+    starter:"#include <iostream>\nusing namespace std;\nint main(){\n    cout << \"Hello, World!\" << endl;\n    return 0;\n}\n"},
+  c:{label:"🔵 C",short:"🔵 C",piston:"c",ver:"10.2.0",monaco:"c",ext:".c",
+    starter:"#include <stdio.h>\nint main(){\n    printf(\"Hello, World!\\n\");\n    return 0;\n}\n"},
+  java:{label:"☕ Java",short:"☕ Java",piston:"java",ver:"15.0.2",monaco:"java",ext:".java",
+    starter:"public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, World!\");\n    }\n}\n"},
+  go:{label:"🐹 Go",short:"🐹 Go",piston:"go",ver:"1.16.2",monaco:"go",ext:".go",
+    starter:"package main\nimport \"fmt\"\nfunc main(){\n    fmt.Println(\"Hello, World!\")\n}\n"},
+  rust:{label:"🦀 Rust",short:"🦀 Rs",piston:"rust",ver:"1.50.0",monaco:"rust",ext:".rs",
+    starter:"fn main(){\n    println!(\"Hello, World!\");\n}\n"},
+  php:{label:"🐘 PHP",short:"🐘 PHP",piston:"php",ver:"8.2.3",monaco:"php",ext:".php",
+    starter:"<?php\necho \"Hello, World!\\n\";\n"},
+  ruby:{label:"💎 Ruby",short:"💎 Rb",piston:"ruby",ver:"3.0.1",monaco:"ruby",ext:".rb",
+    starter:"puts \"Hello, World!\"\n"},
+  bash:{label:"🐚 Bash",short:"🐚 Sh",piston:"bash",ver:"5.2.0",monaco:"shell",ext:".sh",
+    starter:"#!/bin/bash\necho \"Hello, World!\"\n"},
+  lua:{label:"🌙 Lua",short:"🌙 Lua",piston:"lua",ver:"5.4.4",monaco:"lua",ext:".lua",
+    starter:"print(\"Hello, World!\")\n"},
+  csharp:{label:"💠 C#",short:"💠 C#",piston:"csharp",ver:"6.12.0",monaco:"csharp",ext:".cs",
+    starter:"using System;\nclass Program{\n    static void Main(){\n        Console.WriteLine(\"Hello, World!\");\n    }\n}\n"},
+  kotlin:{label:"🟣 Kotlin",short:"🟣 Kt",piston:"kotlin",ver:"1.8.20",monaco:"kotlin",ext:".kt",
+    starter:"fun main(){\n    println(\"Hello, World!\")\n}\n"},
+  swift:{label:"🍎 Swift",short:"🍎 Sw",piston:"swift",ver:"5.3.3",monaco:"swift",ext:".swift",
+    starter:"import Foundation\nprint(\"Hello, World!\")\n"},
+};
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 700;
+let monacoEditor = null, monacoReady = false;
+let activeFile = null, activeLang = "javascript";
+let outputOpen = false, sidebarOpen = false;
+let runCount = 0;
+
+// VFS: { "path/to/file.js": { content, language } }
+// Folders are inferred from paths
+const vfs = {};
+// Folder open/closed state
+const folderOpen = {};
+
+// ═══════════════════════════════════════════════
+// EDITOR MODE
+// ═══════════════════════════════════════════════
+function useMobileEditor() {
+  document.getElementById("monaco-container").style.display = "none";
+  document.getElementById("txt-editor").style.display = "block";
+}
+function useMonacoEditor() {
+  document.getElementById("monaco-container").style.display = "block";
+  document.getElementById("txt-editor").style.display = "none";
+}
+
+// ═══════════════════════════════════════════════
+// MONACO INIT
+// ═══════════════════════════════════════════════
+if (!isMobile) {
+  require.config({paths:{vs:"https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs"}});
+  require(["vs/editor/editor.main"], () => {
+    monaco.editor.defineTheme("cl",{
+      base:"vs-dark",inherit:true,
+      rules:[
+        {token:"comment",foreground:"5c6370",fontStyle:"italic"},
+        {token:"keyword",foreground:"c678dd"},{token:"string",foreground:"98c379"},
+        {token:"number",foreground:"d19a66"},{token:"function",foreground:"61afef"},
+      ],
+      colors:{
+        "editor.background":"#0e0e16","editor.foreground":"#abb2bf",
+        "editor.lineHighlightBackground":"#1a1a2e80",
+        "editorLineNumber.foreground":"#3d3d5c",
+        "editorLineNumber.activeForeground":"#5865f2",
+        "editor.selectionBackground":"#5865f233",
+        "editorCursor.foreground":"#5865f2",
+      }
+    });
+    monacoEditor = monaco.editor.create(document.getElementById("monaco-container"),{
+      value:"",language:"javascript",theme:"cl",
+      fontSize:14,fontFamily:'"JetBrains Mono",monospace',
+      lineHeight:22,minimap:{enabled:true},
+      scrollBeyondLastLine:false,wordWrap:"off",tabSize:2,
+      insertSpaces:true,autoIndent:"full",formatOnPaste:true,
+      suggestOnTriggerCharacters:true,
+      quickSuggestions:{other:true,comments:true,strings:true},
+      parameterHints:{enabled:true},snippetSuggestions:"top",
+      renderLineHighlight:"gutter",smoothScrolling:true,
+      cursorBlinking:"phase",cursorSmoothCaretAnimation:"on",
+      bracketPairColorization:{enabled:true},
+      guides:{bracketPairs:true,indentation:true},
+      padding:{top:10},scrollbar:{verticalScrollbarSize:5,horizontalScrollbarSize:5},
+    });
+    monacoReady = true;
+    useMonacoEditor();
+    monacoEditor.onDidChangeCursorPosition(e => {
+      document.getElementById("sb-cur").textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+    });
+    monacoEditor.onDidChangeModelContent(() => {
+      if (activeFile) vfs[activeFile].content = monacoEditor.getValue();
+      renderTabs(); renderTree();
+    });
+    monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runCode);
+    monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, downloadActive);
+
+    outputOpen = true;
+    document.getElementById("rhandle").style.display = "";
+    initApp();
+  });
+} else {
+  useMobileEditor();
+  document.getElementById("txt-editor").addEventListener("keydown", e => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const s = e.target.selectionStart, en = e.target.selectionEnd;
+      e.target.value = e.target.value.substring(0,s) + "  " + e.target.value.substring(en);
+      e.target.selectionStart = e.target.selectionEnd = s + 2;
+      onTxtInput();
+    }
+  });
+  initApp();
+}
+
+window.addEventListener("resize", () => { monacoEditor?.layout(); });
+
+function initApp() {
+  createFile("main.js", "javascript", LANGS.javascript.starter);
+  buildLangList();
+  log("system", "✦ CodeLab ready" + (isMobile ? " (Mobile mode)" : " — Ctrl+Enter to run"));
+  log("info", "🌐 Piston API + JSZip | รองรับ ZIP upload + Folder tree");
+  if (!isMobile) {
+    document.getElementById("out-panel").classList.remove("dh");
+  }
+}
+
+function onTxtInput() {
+  if (!activeFile) return;
+  vfs[activeFile].content = document.getElementById("txt-editor").value;
+  renderTabs(); renderTree();
+}
+
+// ═══════════════════════════════════════════════
+// VFS HELPERS
+// ═══════════════════════════════════════════════
+function normPath(p) { return p.replace(/\\/g, "/").replace(/^\//, ""); }
+function dirOf(p) {
+  const parts = p.split("/");
+  parts.pop();
+  return parts.join("/");
+}
+function nameOf(p) { return p.split("/").pop(); }
+function guessLang(name) {
+  const e = name.split(".").pop().toLowerCase();
+  const m = {js:"javascript",ts:"typescript",py:"python",cpp:"cpp",c:"c",java:"java",
+    go:"go",rs:"rust",php:"php",rb:"ruby",sh:"bash",lua:"lua",cs:"csharp",kt:"kotlin",
+    swift:"swift",json:"json",md:"markdown",html:"html",css:"css"};
+  return m[e] || "plaintext";
+}
+function getIcon(name) {
+  const e = name.split(".").pop();
+  const m = {js:"⚡",ts:"📘",py:"🐍",cpp:"⚙️",c:"🔵",java:"☕",go:"🐹",rs:"🦀",
+    php:"🐘",rb:"💎",sh:"🐚",lua:"🌙",cs:"💠",kt:"🟣",swift:"🍎",
+    json:"{}",md:"📝",txt:"📄",html:"🌐",css:"🎨"};
+  return m[e] || "📄";
+}
+
+// All unique folder paths in vfs
+function allFolders() {
+  const folders = new Set();
+  for (const path of Object.keys(vfs)) {
+    const parts = path.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      folders.add(parts.slice(0, i).join("/"));
+    }
+  }
+  return folders;
+}
+
+function createFile(path, lang, content = "") {
+  path = normPath(path);
+  if (!path) return;
+  if (vfs[path]) { switchFile(path); return; }
+  vfs[path] = { content, language: lang || guessLang(path) };
+  // Ensure parent folders are "open"
+  const parts = path.split("/");
+  for (let i = 1; i < parts.length; i++) {
+    const fp = parts.slice(0, i).join("/");
+    if (folderOpen[fp] === undefined) folderOpen[fp] = true;
+  }
+  renderTabs(); renderTree();
+  switchFile(path);
+  const lk = Object.keys(LANGS).find(k => LANGS[k].monaco === (lang || guessLang(path)));
+  if (lk) setLang(lk, false);
+}
+
+function createFolder(path) {
+  path = normPath(path);
+  if (!path) return;
+  folderOpen[path] = true;
+  renderTree();
+  toast("📁 " + path);
+}
+
+// Open tabs (ordered list of open file paths)
+const openTabs = [];
+
+function switchFile(path) {
+  path = normPath(path);
+  if (!vfs[path]) return;
+
+  // Save current content
+  if (activeFile) {
+    if (monacoReady && monacoEditor) {
+      vfs[activeFile].content = monacoEditor.getValue();
+    } else {
+      vfs[activeFile].content = document.getElementById("txt-editor").value;
+    }
+  }
+
+  if (!openTabs.includes(path)) openTabs.push(path);
+  activeFile = path;
+
+  const content = vfs[path].content;
+  const lang = vfs[path].language;
+
+  if (monacoReady && monacoEditor) {
+    const uri = monaco.Uri.parse("file:///" + path);
+    let model = monaco.editor.getModel(uri);
+    if (!model) model = monaco.editor.createModel(content, lang, uri);
+    monacoEditor.setModel(model);
+    monacoEditor.focus();
+  } else {
+    const ta = document.getElementById("txt-editor");
+    ta.value = content;
+    ta.focus();
+  }
+
+  document.getElementById("empty-state").style.display = "none";
+  document.getElementById("sb-file").textContent = nameOf(path);
+  renderTabs(); renderTree();
+
+  const lk = Object.keys(LANGS).find(k => LANGS[k].monaco === lang) || lang;
+  setLang(lk, false);
+  closeSidebar();
+}
+
+function closeTab(path, ev) {
+  ev && ev.stopPropagation();
+  const idx = openTabs.indexOf(path);
+  if (idx === -1) return;
+  openTabs.splice(idx, 1);
+  if (monacoReady) {
+    monaco.editor.getModel(monaco.Uri.parse("file:///" + path))?.dispose();
+  }
+  if (activeFile === path) {
+    activeFile = openTabs[Math.min(idx, openTabs.length - 1)] || null;
+    if (activeFile) switchFile(activeFile);
+    else {
+      if (monacoReady && monacoEditor) monacoEditor.setModel(null);
+      else document.getElementById("txt-editor").value = "";
+      document.getElementById("sb-file").textContent = "No file";
+      document.getElementById("empty-state").style.display = "";
+    }
+  }
+  renderTabs(); renderTree();
+}
+
+// ═══════════════════════════════════════════════
+// RENDER TREE
+// ═══════════════════════════════════════════════
+function renderTree(filter = "") {
+  const tree = document.getElementById("file-tree");
+  tree.innerHTML = "";
+
+  // Build nested structure
+  // node = { name, path, children: {}, files: [] }
+  const root = { files: [], children: {} };
+
+  for (const path of Object.keys(vfs)) {
+    if (filter && !path.toLowerCase().includes(filter.toLowerCase())) continue;
+    const parts = path.split("/");
+    if (parts.length === 1) {
+      root.files.push(path);
+    } else {
+      // Ensure folder nodes exist
+      let node = root;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const folderPath = parts.slice(0, i+1).join("/");
+        if (!node.children[parts[i]]) {
+          node.children[parts[i]] = { name: parts[i], path: folderPath, files: [], children: {} };
+        }
+        node = node.children[parts[i]];
+      }
+      node.files.push(path);
+    }
+  }
+
+  // Also add empty folders
+  for (const fp of allFolders()) {
+    if (filter && !fp.toLowerCase().includes(filter.toLowerCase())) continue;
+    const parts = fp.split("/");
+    let node = root;
+    for (let i = 0; i < parts.length; i++) {
+      const folderPath = parts.slice(0, i+1).join("/");
+      if (!node.children[parts[i]]) {
+        node.children[parts[i]] = { name: parts[i], path: folderPath, files: [], children: {} };
+      }
+      node = node.children[parts[i]];
+    }
+  }
+
+  function renderNode(node, container, depth=0) {
+    // Folders first
+    for (const [fname, child] of Object.entries(node.children).sort((a,b) => a[0].localeCompare(b[0]))) {
+      const isOpen = folderOpen[child.path] !== false;
+      const folder = document.createElement("div");
+      folder.className = "tree-folder";
+      folder.style.paddingLeft = (depth * 8) + "px";
+
+      const row = document.createElement("div");
+      row.className = "folder-row" + (isOpen ? " open" : "");
+      row.innerHTML = `<span class="fi">▶</span><span style="font-size:13px">📁</span><span style="font-size:12px;margin-left:4px">${child.name}</span>`;
+      row.onclick = () => {
+        folderOpen[child.path] = !folderOpen[child.path];
+        renderTree(document.getElementById("tree-search").value);
+      };
+
+      const children = document.createElement("div");
+      children.className = "folder-children" + (!isOpen ? " hidden" : "");
+      renderNode(child, children, depth + 1);
+
+      folder.appendChild(row);
+      folder.appendChild(children);
+      container.appendChild(folder);
+    }
+
+    // Files
+    for (const filePath of node.files.sort()) {
+      const btn = document.createElement("button");
+      btn.className = "tree-file" + (filePath === activeFile ? " active" : "");
+      btn.style.paddingLeft = (depth * 8 + 10) + "px";
+      btn.innerHTML = `<span class="ficon">${getIcon(nameOf(filePath))}</span><span class="fname">${nameOf(filePath)}</span>`;
+      btn.onclick = () => switchFile(filePath);
+      container.appendChild(btn);
+    }
+  }
+
+  renderNode(root, tree);
+}
+
+function filterTree(v) { renderTree(v); }
+
+// ═══════════════════════════════════════════════
+// RENDER TABS
+// ═══════════════════════════════════════════════
+function renderTabs() {
+  const c = document.getElementById("tabs");
+  c.innerHTML = "";
+  const add = document.createElement("button");
+  add.className = "tab-add"; add.textContent = "+"; add.onclick = promptNewFile;
+  c.appendChild(add);
+  for (const path of openTabs) {
+    const t = document.createElement("button");
+    t.className = "tab" + (path === activeFile ? " active" : "");
+    t.innerHTML = `<span>${nameOf(path)}</span><button class="tab-close">×</button>`;
+    t.onclick = () => switchFile(path);
+    t.querySelector(".tab-close").onclick = e => closeTab(path, e);
+    c.appendChild(t);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// LANG
+// ═══════════════════════════════════════════════
+function setLang(key, updateModel = true) {
+  if (!LANGS[key]) return;
+  activeLang = key;
+  document.getElementById("lang-label").textContent = LANGS[key].short;
+  document.getElementById("sb-lang").textContent = LANGS[key].label;
+  if (updateModel && monacoReady && monacoEditor?.getModel()) {
+    monaco.editor.setModelLanguage(monacoEditor.getModel(), LANGS[key].monaco);
+    if (activeFile) vfs[activeFile].language = LANGS[key].monaco;
+  }
+}
+
+function buildLangList() {
+  const list = document.getElementById("lang-list");
+  list.innerHTML = "";
+  for (const [key, cfg] of Object.entries(LANGS)) {
+    const b = document.createElement("button");
+    b.className = "lang-item" + (key === activeLang ? " sel" : "");
+    b.dataset.key = key;
+    b.innerHTML = `<span>${cfg.label}</span><span class="lv">${cfg.ver}</span>${key === activeLang ? '<span class="ck">✓</span>' : ""}`;
+    b.onclick = () => {
+      setLang(key, true);
+      document.querySelectorAll(".lang-item").forEach(el => {
+        el.classList.toggle("sel", el.dataset.key === key);
+        el.querySelector(".ck")?.remove();
+        if (el.dataset.key === key) el.innerHTML += '<span class="ck">✓</span>';
+      });
+      closeModal("modal-lang");
+    };
+    list.appendChild(b);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// RUN CODE
+// ═══════════════════════════════════════════════
+async function runCode() {
+  if (!activeFile) { toast("⚠️ ไม่มีไฟล์"); return; }
+  const cfg = LANGS[activeLang];
+  if (!cfg) { toast("❌ ไม่รองรับ"); return; }
+
+  let code;
+  if (monacoReady && monacoEditor) code = monacoEditor.getValue();
+  else code = document.getElementById("txt-editor").value;
+
+  const stdin = document.getElementById("stdin-inp").value;
+  const args = document.getElementById("args-inp").value.trim().split(/\s+/).filter(Boolean);
+
+  const btn = document.getElementById("btn-run");
+  btn.classList.add("running");
+  btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="4" height="10"/><rect x="9" y="3" width="4" height="10"/></svg> Stop';
+  document.getElementById("sb-status").textContent = "⏳ Running...";
+
+  if (isMobile && !outputOpen) toggleOutput();
+
+  runCount++;
+  const ts = new Date().toLocaleTimeString("th-TH", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  log("system", `▶ Run #${runCount} — ${activeLang} — ${ts}`);
+  const t0 = performance.now();
+
+  try {
+    const res = await fetch("https://emkc.org/api/v2/piston/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: cfg.piston, version: cfg.ver,
+        files: [{ name: nameOf(activeFile), content: code }],
+        stdin, args, run_timeout: 10000, compile_timeout: 15000,
+      }),
+    });
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+
+    if (data.compile?.output?.trim()) log("warn", `[Compile]\n${data.compile.output.trim()}`);
+    const run = data.run || {};
+    if (run.stdout) run.stdout.split("\n").forEach(l => l && log("stdout", l));
+    if (run.stderr) run.stderr.split("\n").forEach(l => l && log("stderr", l));
+    if (!run.stdout && !run.stderr) log("info", "(no output)");
+
+    const exit = run.code ?? 0;
+    log(exit === 0 ? "success" : "stderr", exit === 0 ? `✓ Exit 0 — ${elapsed}s` : `✗ Exit ${exit} — ${elapsed}s`);
+    document.getElementById("sb-status").textContent = exit === 0 ? `✓ ${elapsed}s` : `✗ ${elapsed}s`;
+  } catch (err) {
+    log("stderr", `❌ ${err.message}`);
+    log("info", "💡 ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต");
+    document.getElementById("sb-status").textContent = "✗ Failed";
+  }
+
+  btn.classList.remove("running");
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l10 6-10 6V2z"/></svg> Run';
+  setTimeout(() => { document.getElementById("sb-status").textContent = "Ready"; }, 4000);
+}
+
+// ═══════════════════════════════════════════════
+// FILE OPEN / ZIP / DOWNLOAD
+// ═══════════════════════════════════════════════
+function handleFileOpen(e) {
+  for (const file of e.target.files) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      createFile(file.name, guessLang(file.name), ev.target.result);
+      log("info", `📂 Opened: ${file.name}`);
+    };
+    reader.readAsText(file);
+  }
+  e.target.value = "";
+}
+
+async function handleZipOpen(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  log("system", `📦 Loading ZIP: ${file.name}...`);
+  try {
+    const zip = await JSZip.loadAsync(file);
+    let count = 0;
+    const promises = [];
+    zip.forEach((relPath, zipEntry) => {
+      if (zipEntry.dir) {
+        const p = normPath(relPath);
+        if (p) { folderOpen[p] = true; }
+        return;
+      }
+      // Skip hidden / system files
+      if (nameOf(relPath).startsWith(".") || relPath.includes("__MACOSX")) return;
+      const ext = relPath.split(".").pop().toLowerCase();
+      const textExts = ["js","ts","py","cpp","c","java","go","rs","php","rb","sh","lua","cs","kt","swift",
+        "txt","json","md","html","css","xml","yaml","yml","toml","env","gitignore","jsx","tsx","vue","svelte"];
+      if (!textExts.includes(ext)) return;
+
+      promises.push(
+        zipEntry.async("string").then(content => {
+          const path = normPath(relPath);
+          vfs[path] = { content, language: guessLang(path) };
+          // Open parent folders
+          const parts = path.split("/");
+          for (let i = 1; i < parts.length; i++) {
+            const fp = parts.slice(0, i).join("/");
+            if (folderOpen[fp] === undefined) folderOpen[fp] = true;
+          }
+          count++;
+        })
+      );
+    });
+    await Promise.all(promises);
+    renderTree(); renderTabs();
+    log("success", `✓ Extracted ${count} files from ${file.name}`);
+    // Auto-open first file
+    const first = Object.keys(vfs)[0];
+    if (first && !activeFile) switchFile(first);
+  } catch (err) {
+    log("stderr", `❌ ZIP error: ${err.message}`);
+  }
+  e.target.value = "";
+}
+
+async function downloadActive() {
+  if (!activeFile) { toast("⚠️ ไม่มีไฟล์"); return; }
+  let content;
+  if (monacoReady && monacoEditor) content = monacoEditor.getValue();
+  else content = document.getElementById("txt-editor").value;
+  const blob = new Blob([content], { type: "text/plain" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: nameOf(activeFile) });
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`⬇ ${nameOf(activeFile)}`);
+}
+
+async function downloadAllZip() {
+  const zip = new JSZip();
+  for (const [path, file] of Object.entries(vfs)) {
+    zip.file(path, file.content);
+  }
+  const blob = await zip.generateAsync({ type: "blob" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "codelab_project.zip" });
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("⬇ codelab_project.zip");
+}
+
+// ═══════════════════════════════════════════════
+// NEW FILE / FOLDER MODALS
+// ═══════════════════════════════════════════════
+let _newFileParent = "";
+function promptNewFile(parentFolder = "") {
+  _newFileParent = parentFolder || "";
+  const title = parentFolder ? `📄 ไฟล์ใหม่ใน ${parentFolder}/` : "📄 ไฟล์ใหม่";
+  document.getElementById("modal-newfile-title").textContent = title;
+  document.getElementById("inp-newfile").value = "";
+  openModal("modal-newfile");
+  setTimeout(() => document.getElementById("inp-newfile").focus(), 80);
+}
+function confirmNewFile() {
+  let name = document.getElementById("inp-newfile").value.trim();
+  if (!name) return;
+  if (!name.includes(".")) name += LANGS[activeLang]?.ext || ".txt";
+  const path = _newFileParent ? `${_newFileParent}/${name}` : name;
+  closeModal("modal-newfile");
+  createFile(path, guessLang(name), LANGS[guessLang(name)]?.starter || "");
+  log("info", `✦ New file: ${path}`);
+}
+
+function promptNewFolder() {
+  document.getElementById("inp-newfolder").value = "";
+  openModal("modal-newfolder");
+  setTimeout(() => document.getElementById("inp-newfolder").focus(), 80);
+}
+function confirmNewFolder() {
+  let name = document.getElementById("inp-newfolder").value.trim();
+  if (!name) return;
+  closeModal("modal-newfolder");
+  createFolder(name);
+  log("info", `✦ New folder: ${name}`);
+}
+
+// ═══════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════
+function log(type, msg) {
+  const wrap = document.getElementById("out-scroll");
+  const line = document.createElement("div"); line.className = "log-line";
+  const t = new Date().toLocaleTimeString("th-TH", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  line.innerHTML = `<span class="lt">${t}</span><span class="lm log-${type}">${esc(msg)}</span>`;
+  wrap.appendChild(line);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function clearLog() { document.getElementById("out-scroll").innerHTML = ""; }
+
+// ═══════════════════════════════════════════════
+// UI TOGGLES
+// ═══════════════════════════════════════════════
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById("sidebar").classList.toggle("on", sidebarOpen);
+  document.getElementById("sb-overlay").classList.toggle("on", sidebarOpen);
+}
+function closeSidebar() {
+  sidebarOpen = false;
+  document.getElementById("sidebar").classList.remove("on");
+  document.getElementById("sb-overlay").classList.remove("on");
+}
+function toggleOutput() {
+  outputOpen = !outputOpen;
+  const p = document.getElementById("out-panel");
+  if (window.innerWidth <= 700) {
+    p.classList.toggle("mo", outputOpen);
+    p.classList.remove("dh");
+  } else {
+    p.classList.toggle("dh", !outputOpen);
+    document.getElementById("rhandle").style.display = outputOpen ? "" : "none";
+  }
+  monacoEditor?.layout();
+}
+function switchOpTab(btn, tab) {
+  document.querySelectorAll(".op-tab").forEach(t => t.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("out-scroll").style.display = tab === "out" ? "" : "none";
+  document.getElementById("stdin-sec").classList.toggle("on", tab === "stdin");
+  document.getElementById("args-sec").classList.toggle("on", tab === "args");
+}
+
+// ═══════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════
+function openModal(id) { document.getElementById(id).classList.add("on"); }
+function closeModal(id) { document.getElementById(id).classList.remove("on"); }
+
+// ═══════════════════════════════════════════════
+// RESIZE (desktop)
+// ═══════════════════════════════════════════════
+let isResizing = false;
+function startResize(e) {
+  isResizing = true;
+  document.getElementById("rhandle").classList.add("drag");
+  document.addEventListener("mousemove", doResize);
+  document.addEventListener("mouseup", stopResize);
+}
+function doResize(e) {
+  if (!isResizing) return;
+  const rect = document.getElementById("app").getBoundingClientRect();
+  const w = Math.max(180, Math.min(620, rect.right - e.clientX));
+  document.getElementById("out-panel").style.width = w + "px";
+  monacoEditor?.layout();
+}
+function stopResize() {
+  isResizing = false;
+  document.getElementById("rhandle").classList.remove("drag");
+  document.removeEventListener("mousemove", doResize);
+  document.removeEventListener("mouseup", stopResize);
+}
+
+// ═══════════════════════════════════════════════
+// MOBILE DRAWER DRAG
+// ═══════════════════════════════════════════════
+let dragY = 0, dragH = 0;
+const dh = document.getElementById("dhandle");
+dh.addEventListener("touchstart", e => {
+  dragY = e.touches[0].clientY;
+  dragH = document.getElementById("out-panel").offsetHeight;
+}, { passive: true });
+dh.addEventListener("touchmove", e => {
+  const dy = dragY - e.touches[0].clientY;
+  const h = Math.max(40, Math.min(window.innerHeight * 0.72, dragH + dy));
+  document.getElementById("out-panel").style.height = h + "px";
+  if (h > 40) outputOpen = true;
+}, { passive: true });
+dh.addEventListener("touchend", () => {
+  if (document.getElementById("out-panel").offsetHeight < 80) {
+    document.getElementById("out-panel").style.height = "0";
+    outputOpen = false;
+  }
+});
+
+// ═══════════════════════════════════════════════
+// DRAG & DROP FILES/ZIP
+// ═══════════════════════════════════════════════
+document.addEventListener("dragover", e => { e.preventDefault(); document.getElementById("drop-zone").classList.add("on"); });
+document.addEventListener("dragleave", e => { if (!e.relatedTarget) document.getElementById("drop-zone").classList.remove("on"); });
+document.addEventListener("drop", async e => {
+  e.preventDefault();
+  document.getElementById("drop-zone").classList.remove("on");
+  for (const file of e.dataTransfer.files) {
+    if (file.name.endsWith(".zip")) {
+      const input = document.getElementById("fi-zip");
+      // Simulate input change with DataTransfer
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      await handleZipOpen({ target: input });
+    } else {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        createFile(file.name, guessLang(file.name), ev.target.result);
+        log("info", `📂 Dropped: ${file.name}`);
+      };
+      reader.readAsText(file);
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  setTimeout(() => t.classList.remove("on"), 2200);
+}
+</script>
+</body>
+</html>
